@@ -57,13 +57,29 @@ export const submitApplicationBackend = async (
   draft: ApplicationDraft,
   lockedFields: Record<string, LockedField>
 ): Promise<SubmissionResponse> => {
-  // Simulated backend API latency
-  await new Promise((res) => setTimeout(res, 800));
-
   // Server-side authoritative validation check
   const valResult = validateApplicationDraft(draft, lockedFields);
   if (!valResult.valid) {
     throw new Error(valResult.errors.join(' '));
+  }
+
+  // Persist application to backend & trigger real-time WebSocket broadcast
+  try {
+    const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    await fetch(`${backendHost}/api/applications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applicationId: draft.applicationId,
+        scholarshipTitle: draft.scholarshipTitle,
+        applicantName: draft.personal.fullName,
+        email: draft.personal.email,
+        status: 'SUBMITTED',
+        veriflowStatus: 'normal',
+      }),
+    });
+  } catch (err) {
+    console.warn('Backend application submission endpoint warning:', err);
   }
 
   return {
