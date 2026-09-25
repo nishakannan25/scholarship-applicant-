@@ -65,15 +65,16 @@ export const RegisterPage: React.FC = () => {
       // 1. Set user session state in store
       login(newUser, 'mock-jwt-token-register');
 
-      // 2. Persist directly into SQLite database file (scholarpath.db)
+      // 2. Persist directly into SQLite database file & trigger real-time WebSocket cross-portal broadcast
       try {
-        await fetch('http://localhost:8000/api/applicants', {
+        const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        await fetch(`${backendHost}/api/applicants`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newUser),
         });
       } catch (err) {
-        console.warn('SQLite backend connection attempt:', err);
+        console.warn('Backend registration API error:', err);
       }
     }
 
