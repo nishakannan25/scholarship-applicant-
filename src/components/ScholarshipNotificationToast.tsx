@@ -19,39 +19,60 @@ export const ScholarshipNotificationToast: React.FC = () => {
 
   useEffect(() => {
     // Connect to Shared Backend WebSocket Server (Production environment variable or Render/localhost)
-    const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-    const wsUrl = backendHost.replace(/^http/, 'ws');
+    const backendHost = import.meta.env.VITE_BACKEND_URL || 'https://scholarship-applicant.onrender.com';
+    const wsUrl = backendHost.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
     let socket: WebSocket | null = null;
+    let pollInterval: any = null;
 
     function connectWS() {
-      socket = new WebSocket(wsUrl);
+      try {
+        socket = new WebSocket(wsUrl);
 
-      socket.onopen = () => {
-        console.log('📡 Connected to Real-Time Cross-Portal WebSocket Server!');
-      };
+        socket.onopen = () => {
+          console.log('📡 Connected to Real-Time Cross-Portal WebSocket Server (WSS)!');
+        };
 
-      socket.onmessage = (event) => {
-        try {
-          const data: NotificationPayload = JSON.parse(event.data);
-          if (data.type === 'SCHOLARSHIP_AMOUNT_UPDATED') {
-            setNotification(data);
-            setVisible(true);
+        socket.onmessage = (event) => {
+          try {
+            const data: NotificationPayload = JSON.parse(event.data);
+            if (data.type === 'SCHOLARSHIP_AMOUNT_UPDATED') {
+              setNotification(data);
+              setVisible(true);
+            }
+          } catch (err) {
+            console.error('Error handling WS notification:', err);
           }
-        } catch (err) {
-          console.error('Error handling WS notification:', err);
-        }
-      };
+        };
 
-      socket.onclose = () => {
-        console.log('WebSocket disconnected. Reconnecting in 3 seconds...');
-        setTimeout(connectWS, 3000);
-      };
+        socket.onclose = () => {
+          setTimeout(connectWS, 4000);
+        };
+      } catch (e) {
+        console.warn('WS Connection Error:', e);
+      }
     }
 
     connectWS();
 
+    // Fallback Polling every 4 seconds to guarantee delivery even if WebSocket is delayed
+    let lastSeenTimestamp = Date.now();
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${backendHost}/api/notifications/latest`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.timestamp > lastSeenTimestamp && data.type === 'SCHOLARSHIP_AMOUNT_UPDATED') {
+            lastSeenTimestamp = data.timestamp;
+            setNotification(data);
+            setVisible(true);
+          }
+        }
+      } catch (err) {}
+    }, 4000);
+
     return () => {
       if (socket) socket.close();
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
 

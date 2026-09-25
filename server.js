@@ -66,8 +66,11 @@ wss.on('connection', (ws) => {
   });
 });
 
+let lastNotification = null;
+
 // Broadcast Real-Time Event to all connected Admin & Applicant Clients
 const broadcastNotification = (data) => {
+  lastNotification = data;
   const payloadStr = JSON.stringify(data);
   wsClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -75,6 +78,11 @@ const broadcastNotification = (data) => {
     }
   });
 };
+
+// API Endpoint to fetch latest broadcasted notification (Polling Fallback)
+app.get('/api/notifications/latest', (req, res) => {
+  res.json(lastNotification || {});
+});
 
 // Redis-compatible OTP store
 class RedisOtpStore {
